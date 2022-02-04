@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"sync"
 	"time"
 )
 
@@ -32,11 +33,14 @@ func NewCache(f Function) *Memory {
 	}
 }
 
-func (m *Memory) Get(key int) (interface{}, error) {
+func (m *Memory) Get(key int /*, wg *sync.WaitGroup , lock *sync.RWMutex*/) (interface{}, error) {
 	result, exists := m.cache[key]
 	if !exists {
+		//defer wg.Done()
+		//lock.Lock()
 		result.value, result.err = m.f(key)
 		m.cache[key] = result
+		//lock.Unlock()
 	}
 	return result.value, result.err
 }
@@ -45,15 +49,28 @@ func GetFibonacci(n int) (interface{}, error) {
 	return Fibonacci(n), nil
 }
 
-func main() {
+func procesarNumeros(n int, wg *sync.WaitGroup) {
+	//var lock sync.RWMutex
+	defer wg.Done()
 	cache := NewCache(GetFibonacci)
-	fibo := []int{42, 40, 41, 42, 38}
-	for _, n := range fibo {
-		start := time.Now()
-		value, err := cache.Get(n)
-		if err != nil {
-			log.Println(err)
-		}
-		fmt.Printf("%d, %s, %d\n", n, time.Since(start), value)
+
+	start := time.Now()
+	value, err := cache.Get(n /*, wg , &lock*/)
+	if err != nil {
+		log.Println(err)
 	}
+	fmt.Printf("%d, %s, %d\n", n, time.Since(start), value)
+	//wg.Wait()
+	//wg.Done()
+}
+
+func main() {
+	var wg sync.WaitGroup
+	fibo := []int{42, 40, 41, 42, 38}
+	cantidadN := len(fibo)
+	wg.Add(cantidadN)
+	for _, n := range fibo {
+		go procesarNumeros(n, &wg)
+	}
+	wg.Wait()
 }
